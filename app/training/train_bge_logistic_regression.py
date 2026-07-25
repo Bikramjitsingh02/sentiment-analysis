@@ -1,5 +1,8 @@
+import argparse
 import os
 from pathlib import Path
+
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 import joblib
 from sentence_transformers import SentenceTransformer
@@ -8,7 +11,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
 
 from app.training.bge_model import BGELogisticRegressionModel
-from app.training.train_logistic_regression import load_and_prepare_data
+from app.training.train_logistic_regression import load_and_prepare_data, load_combined_data
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 MODEL_PATH = PROJECT_ROOT / "app" / "model" / "sentiment_model_bge.joblib"
@@ -16,8 +19,9 @@ MODEL_PATH = PROJECT_ROOT / "app" / "model" / "sentiment_model_bge.joblib"
 EMBEDDING_MODEL_NAME = "BAAI/bge-base-en-v1.5"
 
 
-def train_model():
-    X, y = load_and_prepare_data()
+def train_model(use_combined: bool = False):
+    X, y = load_combined_data() if use_combined else load_and_prepare_data()
+    print(f"Dataset: {'combined' if use_combined else 'clothing'} — {len(X):,} samples")
 
     X_train, X_test, y_train, y_test = train_test_split(
         X,
@@ -28,7 +32,7 @@ def train_model():
     )
 
     print(f"Loading encoder: {EMBEDDING_MODEL_NAME}")
-    encoder = SentenceTransformer(EMBEDDING_MODEL_NAME)
+    encoder = SentenceTransformer(EMBEDDING_MODEL_NAME, device="cpu")
 
     print(f"Embedding {len(X_train):,} training samples …")
     X_train_emb = encoder.encode(
@@ -71,4 +75,7 @@ def train_model():
 
 
 if __name__ == "__main__":
-    train_model()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--combined", action="store_true", help="Train on combined_reviews.csv instead of clothing only")
+    args = parser.parse_args()
+    train_model(use_combined=args.combined)

@@ -1,3 +1,4 @@
+import argparse
 import os
 from pathlib import Path
 
@@ -12,7 +13,8 @@ from sklearn.metrics import classification_report, confusion_matrix, accuracy_sc
 
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent
-DATA_PATH = PROJECT_ROOT/ "app" / "data" / "reviews.csv"
+DATA_PATH = PROJECT_ROOT / "app" / "data" / "reviews.csv"
+COMBINED_DATA_PATH = PROJECT_ROOT / "app" / "data" / "combined_reviews.csv"
 MODEL_PATH = PROJECT_ROOT / "app" / "model" / "sentiment_model.joblib"
 
 TEXT_COL = "Review Text"
@@ -21,23 +23,33 @@ RATING_COL = "Rating"
 
 def load_and_prepare_data():
     df = pd.read_csv(DATA_PATH)
-
     df = df[[TEXT_COL, RATING_COL]].dropna()
-
-    # Remove neutral reviews for binary classification
     df = df[df[RATING_COL] != 3]
-
-    # 1,2 => negative = 0 | 4,5 => positive = 1
     df["label"] = df[RATING_COL].apply(lambda x: 1 if x >= 4 else 0)
-
     X = df[TEXT_COL].astype(str)
     y = df["label"]
-
     return X, y
 
 
-def train_model():
-    X, y = load_and_prepare_data()
+def load_combined_data():
+    """Load the combined dataset produced by combine_datasets.py.
+    Expects columns: text, rating (1,2,4,5 — no 3-stars)."""
+    if not COMBINED_DATA_PATH.exists():
+        raise FileNotFoundError(
+            f"Combined dataset not found at {COMBINED_DATA_PATH}. "
+            "Run: python -m app.training.combine_datasets"
+        )
+    df = pd.read_csv(COMBINED_DATA_PATH, usecols=["text", "rating"])
+    df = df.dropna(subset=["text", "rating"])
+    df["label"] = df["rating"].apply(lambda x: 1 if x >= 4 else 0)
+    X = df["text"].astype(str)
+    y = df["label"]
+    return X, y
+
+
+def train_model(use_combined: bool = False):
+    X, y = load_combined_data() if use_combined else load_and_prepare_data()
+    print(f"Dataset: {'combined' if use_combined else 'clothing'} — {len(X):,} samples")
 
     X_train, X_test, y_train, y_test = train_test_split(
         X,
@@ -80,4 +92,7 @@ def train_model():
 
 
 if __name__ == "__main__":
-    train_model()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--combined", action="store_true", help="Train on combined_reviews.csv instead of clothing only")
+    args = parser.parse_args()
+    train_model(use_combined=args.combined)

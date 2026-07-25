@@ -1,3 +1,4 @@
+import argparse
 import os
 from pathlib import Path
 
@@ -10,14 +11,15 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.svm import LinearSVC
 from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
 
-from app.training.train_logistic_regression import load_and_prepare_data, DATA_PATH
+from app.training.train_logistic_regression import load_and_prepare_data, load_combined_data, DATA_PATH
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 MODEL_PATH = PROJECT_ROOT / "app" / "model" / "sentiment_model_svm.joblib"
 
 
-def train_model():
-    X, y = load_and_prepare_data()
+def train_model(use_combined: bool = False):
+    X, y = load_combined_data() if use_combined else load_and_prepare_data()
+    print(f"Dataset: {'combined' if use_combined else 'clothing'} — {len(X):,} samples")
 
     X_train, X_test, y_train, y_test = train_test_split(
         X,
@@ -64,4 +66,7 @@ def train_model():
 
 
 if __name__ == "__main__":
-    train_model()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--combined", action="store_true", help="Train on combined_reviews.csv instead of clothing only")
+    args = parser.parse_args()
+    train_model(use_combined=args.combined)
